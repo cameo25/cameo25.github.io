@@ -13,6 +13,9 @@ from datetime import datetime, timedelta
 import os
 import time
 
+# Create a persistent session
+session = requests.Session()
+
 def load_translations(file_path: str = None) -> Dict[str, str]:
     """
     Load translation mappings from a file.
@@ -90,11 +93,17 @@ def fetch_page(page_number) -> str:
         'Accept-Encoding': 'gzip, deflate, br',
         'DNT': '1',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://worldbeyblade.org/',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin'
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        # Add a small delay before each request to appear more human-like
+        time.sleep(2)
+        response = session.get(url, headers=headers, timeout=30)
         response.raise_for_status()
         return response.text
     except requests.RequestException as e:
@@ -188,7 +197,6 @@ def find_page_for_date(target_date: datetime, start_page: int = 200, max_pages_t
         dates = extract_dates_from_page(html)
 
         if not dates:
-            time.sleep(1)
             continue
 
         # Sort dates to get earliest and latest
@@ -200,9 +208,6 @@ def find_page_for_date(target_date: datetime, start_page: int = 200, max_pages_t
         if earliest <= target_date <= latest:
             print(f"  Found! Page {page_num} (date range: {earliest.strftime('%m-%d-%Y')} to {latest.strftime('%m-%d-%Y')})")
             return page_num
-
-        # Add small delay to avoid spamming server
-        time.sleep(1)
 
     print(f"  Could not find page for {target_date.strftime('%m-%d-%Y')}")
     return None
@@ -301,10 +306,6 @@ def scrape_multiple_pages(start_page: int, end_page, translations: Dict[str, str
             print(f"  Found {len(combinations)} combinations on page {page_num}")
         else:
             print(f"  Skipping page {page_num} (no content)")
-
-        # Add 1-second delay between page fetches to avoid spamming the server
-        if page_num < actual_end_page:
-            time.sleep(1)
 
     return all_combinations
 
@@ -744,10 +745,28 @@ def scrape_time_period(days: int, title: str, output_prefix: str, translations: 
         print("\nNo combinations found.")
         return None
 
+def initialize_session():
+    """Initialize session by visiting the homepage to get cookies."""
+    print("Initializing session...")
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
+    try:
+        session.get('https://worldbeyblade.org/', headers=headers, timeout=30)
+        print("Session initialized successfully")
+        time.sleep(2)
+    except Exception as e:
+        print(f"Warning: Could not initialize session: {e}")
+
 def main():
     """Main function."""
     print("Beyblade Combination Scraper")
     print("=" * 50)
+
+    # Initialize session with homepage visit
+    initialize_session()
 
     # Load translations for abbreviations
     print("\nLoading suffix translations...")
